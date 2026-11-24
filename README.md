@@ -29,3 +29,5 @@ python3 -m venv .venv
 ## Hosting
 
 GitHub Pages serves the repository root on the `main` branch. Run `build.py` after changing the template or assets; it updates both HTML entry points. Commit both outputs to update the public site.
+
+The PDF button is always available and regenerates the preview from current settings. A loading message and spinner show initialization and generation; PDF serialization runs in a Web Worker to keep the page responsive. If automatic opening is blocked, use the generated PDF link.

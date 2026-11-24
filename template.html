@@ -2,12 +2,19 @@
 <style>
 @font-face{font-family:WorksheetLabels;src:url(data:font/ttf;base64,__FONT_BYTES__) format("truetype")}
 *{box-sizing:border-box}body{margin:0;background:#f6f3eb;color:#263e36;font:16px system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:28px}h1{font-size:32px;margin-bottom:8px}p{line-height:1.5}textarea,input,select,button{font:inherit;border:1px solid #bac8be;border-radius:8px;padding:10px}textarea{width:100%;height:110px;background:white}label{display:flex;flex-direction:column;gap:6px}.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin:20px 0}button{cursor:pointer;background:#285b49;color:white;margin:6px 8px 6px 0}button:disabled{opacity:.5;cursor:wait}#preview{background:white;margin-top:20px;box-shadow:0 3px 20px #0001}#preview svg{display:block;width:100%;height:auto}details{margin-top:24px}pre{white-space:pre-wrap;font-size:12px}#status{min-height:24px}small{color:#567063}
+.busy{display:flex;align-items:center;gap:10px;margin:16px 0}.spinner{width:22px;height:22px;border:3px solid #bac8be;border-top-color:#285b49;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}.busy[hidden]{display:none}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
 </style><main><h1>Hanzi practice sheets</h1><p>Create printable handwriting worksheets with stroke order and tracing guides.</p><label>Characters or words<textarea id="text" spellcheck="false" aria-describedby="entry-help">学习 | xue2xi2 | to study
-人</textarea></label><small id="entry-help">Enter one word or group per line. Add optional pinyin and a definition as in <code>学习 | xuéxí | to study</code>. Numbered pinyin such as <code>xue2xi2</code> prints with tone marks. For a definition alone, leave the pinyin field blank.</small><div class="settings"><label>Cell size (mm)<input id="size" type="number" min="12" max="30" value="20"></label><label>Practice rows / character<input id="rows" type="number" min="1" max="8" value="2"></label><label>Tracing cells / row<input id="traces" type="number" min="0" max="12" value="3"></label><label>Grid<select id="grid"><option value="cross">Cross</option><option value="diagonal" selected>Cross and diagonals</option><option value="square">Square</option></select></label><label>Stroke sequence<select id="steps"><option value="yes">Show steps</option><option value="no">Hide steps</option></select></label><label>Repeated characters<select id="duplicates"><option value="no">Keep once</option><option value="yes">Keep repetitions</option></select></label></div><button id="generate">Generate preview</button><button id="download" disabled>Open PDF / Print</button><p id="status" role="status" aria-live="polite"></p><small>A4 • vector artwork • generated privately in your browser • no installation or downloads required • preview shows the first page. Spaces and punctuation are ignored. Up to 200 supported characters per sheet.</small><div id="preview"></div><details><summary>Sources and licenses</summary><p>Stroke data: Hanzi Writer Data 2.0.1 / Make Me a Hanzi. Character outlines are bundled for offline use. Worksheet generator uses its own vector renderer.</p><pre id="licenses"></pre></details></main>
+人</textarea></label><small id="entry-help">Enter one word or group per line. Add optional pinyin and a definition as in <code>学习 | xuéxí | to study</code>. Numbered pinyin such as <code>xue2xi2</code> prints with tone marks. For a definition alone, leave the pinyin field blank.</small><div class="settings"><label>Cell size (mm)<input id="size" type="number" min="12" max="30" value="20"></label><label>Practice rows / character<input id="rows" type="number" min="1" max="8" value="2"></label><label>Tracing cells / row<input id="traces" type="number" min="0" max="12" value="3"></label><label>Grid<select id="grid"><option value="cross">Cross</option><option value="diagonal" selected>Cross and diagonals</option><option value="square">Square</option></select></label><label>Stroke sequence<select id="steps"><option value="yes">Show steps</option><option value="no">Hide steps</option></select></label><label>Repeated characters<select id="duplicates"><option value="no">Keep once</option><option value="yes">Keep repetitions</option></select></label></div><button id="generate">Generate preview</button><button id="download">Open PDF / Print</button><p>On your first visit, loading the character library and preparing your PDF can take a little longer. Please keep this page open while it works.</p><div id="busy" class="busy" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span id="busy-label">Loading the character library… Please wait.</span></div><p id="status" role="status" aria-live="polite"></p><small>A4 • vector artwork • generated privately in your browser • no installation or downloads required • preview shows the first page. Spaces and punctuation are ignored. Up to 200 supported characters per sheet.</small><div id="pdf-result"></div><div id="preview"></div><details><summary>Sources and licenses</summary><p>Stroke data: Hanzi Writer Data 2.0.1 / Make Me a Hanzi. Character outlines are bundled for offline use. Worksheet generator uses its own vector renderer.</p><pre id="licenses"></pre></details></main>
+<script>
+let queuedAction=null;
+for(const [id,action] of [['download','pdf'],['generate','preview']])document.getElementById(id).onclick=()=>{queuedAction=action;document.getElementById('busy-label').textContent='Loading the character library… Your '+(action==='pdf'?'PDF':'preview')+' will be prepared as soon as it is ready.'};
+</script>
 <script id="dataset" type="application/json">__DATA__</script><script id="license-data" type="application/json">__LICENSES__</script><script id="brand-mark" type="application/json">__BRAND_MARK__</script>
 <script id="font-info" type="application/json">__FONT_INFO__</script>
 <script>
+setTimeout(async()=>{
 'use strict';
+await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
 const data=JSON.parse(document.getElementById('dataset').textContent), $=id=>document.getElementById(id);
 $('licenses').textContent=JSON.parse($('license-data').textContent);
 const annotationFont = JSON.parse($('font-info').textContent);
@@ -423,17 +430,58 @@ function pdf(pages) {
   return out + `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${offset}\n%%EOF\n`;
 }
 
-$('generate').onclick=()=>{try{const b=build();pages=b.result;preview(pages[0]);$('download').disabled=false;$('status').textContent=`${b.count} characters · ${pages.length} pages.`+(b.missing.length?' Unsupported characters skipped: '+b.missing.join(' '):'')}catch(e){pages=null;$('download').disabled=true;$('preview').replaceChildren();$('status').textContent=e.message}};
-let pdfUrl=null;
-$('download').onclick=()=>{
-  if(!pages)return;
-  const viewer=window.open('', '_blank');
-  if(!viewer){$('status').textContent='Allow pop-ups for this site to open the PDF, then try again.';return;}
-  if(pdfUrl)URL.revokeObjectURL(pdfUrl);
-  pdfUrl=URL.createObjectURL(new Blob([pdf(pages)],{type:'application/pdf'}));
-  viewer.opener=null;
-  viewer.location.replace(pdfUrl);
-};
-for(const el of document.querySelectorAll('input,select,textarea'))el.addEventListener('input',()=>{pages=null;$('download').disabled=true;$('status').textContent='Settings changed. Generate a new preview.'});
-$('generate').click();
+let working=false;
+const breathe=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
+function busy(message){$('busy-label').textContent=message;$('busy').hidden=false;$('preview').setAttribute('aria-busy','true')}
+function idle(){$('busy').hidden=true;$('preview').setAttribute('aria-busy','false')}
+function makePdf(currentPages){
+  // Keep the page responsive while serializing large worksheets.
+  return new Promise((resolve,reject)=>{
+    const fontStyle=document.querySelector('style').textContent;
+    const source='const annotationFont='+JSON.stringify(annotationFont)+';const document={querySelector(){return {textContent:'+JSON.stringify(fontStyle)+'}}};'+
+      [fmt,addAnnotationFont,pdfColor,pdfPath,pdf].map(fn=>fn.toString().startsWith('function')?fn.toString():'const fmt='+fn.toString()+';').join('\n')+
+      ';const H='+H+';const W='+W+';onmessage=e=>{try{postMessage({result:pdf(e.data)})}catch(error){postMessage({error:error.message})}}';
+    const url=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+    let worker;
+    const clean=()=>{if(worker)worker.terminate();URL.revokeObjectURL(url)};
+    try{
+      worker=new Worker(url);
+      worker.onmessage=event=>{clean();event.data.error?reject(Error(event.data.error)):resolve(event.data.result)};
+      worker.onerror=()=>{clean();reject(Error('Could not prepare the PDF. Please try again.'))};
+      worker.postMessage(currentPages);
+    }catch(error){clean();reject(error)}
+  });
+}
+async function generate(openPdf=false){
+  if(working){$('status').textContent='Your worksheet is being prepared. Please wait.';return}
+  working=true;
+  busy(openPdf?'Preparing your PDF… Updating the preview.':'Generating your preview…');
+  $('status').textContent='';
+  try{
+    await breathe();
+    const b=build();pages=b.result;preview(pages[0]);
+    const summary=`${b.count} characters · ${pages.length} pages.`+(b.missing.length?' Unsupported characters skipped: '+b.missing.join(' '):'');
+    if(openPdf){
+      busy('Creating your PDF… Please keep this page open.');
+      await breathe();
+      const result=await makePdf(pages);
+      const url=URL.createObjectURL(new Blob([result],{type:'application/pdf'}));
+      // A visible link also works when browsers block automatic pop-ups.
+      const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.textContent='Open your PDF / Print';
+      $('pdf-result').replaceChildren(link);
+      link.click();
+      $('status').textContent=summary+' PDF ready. If it did not open, use the link below.';
+    }else $('status').textContent=summary;
+  }catch(error){pages=null;$('status').textContent=error.message}
+  finally{working=false;idle()}
+}
+$('generate').onclick=()=>generate();
+$('download').onclick=()=>generate(true);
+for(const el of document.querySelectorAll('input,select,textarea'))el.addEventListener('input',()=>{
+  $('pdf-result').replaceChildren();
+  if(!working)$('status').textContent='Settings changed. Open PDF / Print will update your preview and PDF.';
+});
+const initial=queuedAction;queuedAction=null;
+await generate(initial==='pdf');
+},0);
 </script></html>
